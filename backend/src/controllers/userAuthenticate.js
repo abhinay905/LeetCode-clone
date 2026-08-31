@@ -7,23 +7,25 @@ const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 
 
+//this registers the user
 const register =async (req,res) =>{
 
     try{
 
         validate(req.body);
-       const {firstName, emailId, password} = req.body;
+       const {firstName, emailId, password} = req.body; // destructuring req.body.firstName to firstName, same for others
 
        req.body.password = await bcrypt.hash(password,10);
        req.body.role = 'user'  // everyone will be registered as user
     
-       const user = await User.create(req.body);
+       const user = await User.create(req.body);   // adds req.body to database
 
        const token = jwt.sign({_id:user._id,emailId:emailId,role:'user'},process.env.JWT_KEY,{expiresIn:60*60})
 
        res.cookie('token',token,{maxAge:60*60*1000}); // maxAge is in milliseconds
 
        res.status(201).send("User registered succesfully"); 
+       
 
     }
     catch(err){
@@ -37,14 +39,19 @@ const login = async (req,res)=>{
          
         const {emailId,password} =  req.body;
 
+
+        // notice that we throw same error in both condition, we don't wanna let a random person know if they've got the right email or password
         if(!emailId)
             throw new Error("Invalid Credentials");
         if(!password)
             throw new Error("Invalid Credentials");
 
-        const user = await User.findOne({emailId})
+        const user = await User.findOne({emailId})  // search the "user" collection to find where this email is
 
-        const match = bcrypt.compare(password, user.password);
+        const match = await bcrypt.compare(password, user.password);
+
+        // if we don't add await before compare, it returns a promise. In Js a promise is an object and all objects are truthy
+        // so if condition below returns false always and it will let even wrong passwords log in
 
         if(!match)
             throw new Error("Invalid Credentials");
@@ -87,11 +94,11 @@ const adminRegister = async (req,res)=>{
        const {firstName, emailId, password} = req.body;
 
        req.body.password = await bcrypt.hash(password,10);
-       req.body.role = 'admin'  
+       
     
        const user = await User.create(req.body);
 
-       const token = jwt.sign({_id:user._id,emailId:emailId,role:'admin'},process.env.JWT_KEY,{expiresIn:60*60})
+       const token = jwt.sign({_id:user._id,emailId:emailId,role:user.role},process.env.JWT_KEY,{expiresIn:60*60})
 
        res.cookie('token',token,{maxAge:60*60*1000}); // maxAge is in milliseconds
 
